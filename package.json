@@ -1,0 +1,20 @@
+{
+  "name": "netease-music-tools",
+  "version": "1.0.0",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon"
+  },
+  "author": "CuiZhenhang",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "NeteaseCloudMusicApi": "^4.25.0",
+    "qrcode": "^1.5.4"
+  }
+}
