@@ -37,8 +37,8 @@ async function main() {
             .example([
                 [colors.green('$0 match-playlist ../audio 123456'), colors.cyan('匹配网易云音乐歌单')],
                 [colors.green('$0 match-like ../audio'), colors.cyan('匹配网易云音乐我喜欢的音乐')],
+                [colors.green('$0 match-manual ../audio/song.mp3 233560'), colors.cyan('手动匹配音频到网易云音乐ID')],
                 [colors.green('$0 update-info ../audio'), colors.cyan('更新已匹配音频的信息')],
-                [colors.green('$0 manual-match ../audio/song.mp3 233560'), colors.cyan('手动匹配音频到网易云音乐ID')],
             ])
             .command({
                 command: 'match-playlist <path> <id> [login]',
@@ -88,26 +88,8 @@ async function main() {
                 }
             })
             .command({
-                command: 'update-info <path>',
-                aliases: ['u-info'],
-                desc: colors.cyan('更新已匹配音频的信息'),
-                builder: (yargs) => {
-                    return yargs
-                        .positional('path', {
-                            describe: colors.yellow('音频文件夹路径'),
-                            type: 'string',
-                        })
-                        .example([
-                            [colors.green('$0 u-info ../audio'), colors.cyan('更新已匹配音频的信息')],
-                        ])
-                },
-                handler: (argv) => {
-                    argv.operation = 'update-info'
-                }
-            })
-            .command({
-                command: 'manual-match <song> <neteaseId> [login]',
-                aliases: ['m-match', 'mm'],
+                command: 'match-manual <song> <neteaseId> [login]',
+                aliases: ['m-manual', 'mm'],
                 desc: colors.cyan('手动匹配音频到网易云音乐ID'),
                 builder: (yargs) => {
                     return yargs
@@ -130,7 +112,25 @@ async function main() {
                         ])
                 },
                 handler: (argv) => {
-                    argv.operation = 'manual-match'
+                    argv.operation = 'match-manual'
+                }
+            })
+            .command({
+                command: 'update-info <path>',
+                aliases: ['u-info'],
+                desc: colors.cyan('更新已匹配音频的信息'),
+                builder: (yargs) => {
+                    return yargs
+                        .positional('path', {
+                            describe: colors.yellow('音频文件夹路径'),
+                            type: 'string',
+                        })
+                        .example([
+                            [colors.green('$0 u-info ../audio'), colors.cyan('更新已匹配音频的信息')],
+                        ])
+                },
+                handler: (argv) => {
+                    argv.operation = 'update-info'
                 }
             })
             .command({
@@ -158,7 +158,7 @@ async function main() {
                 }
             })
             .command({
-                command: 'clear-manual-match <path>',
+                command: 'clear-manual <path>',
                 desc: colors.gray('清除手动匹配数据'),
                 builder: (yargs) => {
                     return yargs
@@ -167,11 +167,11 @@ async function main() {
                             type: 'string'
                         })
                         .example([
-                            [colors.green('$0 clear-manual-match ../audio'), colors.cyan('清除手动匹配数据')],
+                            [colors.green('$0 clear-manual ../audio'), colors.cyan('清除手动匹配数据')],
                         ])
                 },
                 handler: (argv) => {
-                    argv.operation = 'clear-manual-match'
+                    argv.operation = 'clear-manual'
                 }
             })
             .option('warn', {
@@ -208,11 +208,11 @@ async function main() {
             case 'match-like':
                 await matchLikeList(path.resolve(argv.path))
             break
+            case 'match-manual':
+                await matchManual(path.dirname(argv.song), path.basename(argv.song), argv.neteaseId, argv.login)
+            break
             case 'update-info':
                 await updateAllAudioInfo(path.resolve(argv.path))
-            break
-            case 'manual-match':
-                await manualMatch(path.dirname(argv.song), path.basename(argv.song), argv.neteaseId, argv.login)
             break
             case 'logout':
                 if (await confirm('确认要退出登录吗？')) {
@@ -225,7 +225,7 @@ async function main() {
             case 'clear-cache':
                 await clearCache(path.resolve(argv.path))
             break
-            case 'clear-manual-match':
+            case 'clear-manual':
                 await clearManualMatch(path.resolve(argv.path))
             break
         }
@@ -286,7 +286,7 @@ async function matchLikeList(path) {
     await music_match(path, songDetailRes.body.songs)
 }
 
-async function manualMatch(path, song, neteaseId, useLogin = false) {
+async function matchManual(path, song, neteaseId, useLogin = false) {
     if (typeof neteaseId !== 'number' || isNaN(neteaseId)) {
         console.error(colors.red('[错误] 请提供正确的网易云音乐ID'))
         return

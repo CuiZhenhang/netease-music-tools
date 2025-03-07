@@ -1,6 +1,6 @@
 {
   "name": "netease-music-tools",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
