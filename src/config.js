@@ -30,7 +30,7 @@ const config = {
     port: Number(process.env.PORT),
     dirTest: path.relative(process.cwd(), process.env.DIR_TEST),
     cacheEncryptionKey: process.env.CACHE_ENCRYPTION_KEY,
-    uid: process.env.UID
+    warnAll: process.env.WARN_ALL === 'true',
 }
 
 module.exports = config
