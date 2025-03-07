@@ -6,7 +6,7 @@ if (!fs.existsSync(path.join(process.cwd(), '.env'))) {
         'PORT=23515\n'
         + 'DIR_TEST=tests\n'
         + `CACHE_ENCRYPTION_KEY=${ require('crypto').randomBytes(16).toString('hex') }\n`
-        + 'UID='
+        + 'WARN_ALL=false'
     );
 
     fs.writeFileSync(path.join(process.cwd(), '.env'), defaultEnv)
