@@ -6,7 +6,8 @@ if (!fs.existsSync(path.join(process.cwd(), '.env'))) {
         'PORT=23515\n'
         + 'DIR_TEST=tests\n'
         + `CACHE_ENCRYPTION_KEY=${ require('crypto').randomBytes(16).toString('hex') }\n`
-        + 'WARN_ALL=false'
+        + 'WARN_ALL=false\n'
+        + 'YES_ALL=false\n'
     );
 
     fs.writeFileSync(path.join(process.cwd(), '.env'), defaultEnv)
@@ -31,6 +32,7 @@ const config = {
     dirTest: path.relative(process.cwd(), process.env.DIR_TEST),
     cacheEncryptionKey: process.env.CACHE_ENCRYPTION_KEY,
     warnAll: process.env.WARN_ALL === 'true',
+    yesAll: process.env.YES_ALL === 'true',
 }
 
 module.exports = config

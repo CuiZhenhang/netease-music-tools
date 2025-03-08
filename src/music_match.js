@@ -1,9 +1,10 @@
 const config = require('./config');
 const fs = require('fs/promises');
 const path = require('path');
+const { stringSimilarity } = require('string-similarity-js');
 const colors = require('colors/safe');
 const { hashFile, sleep } = require('./utils');
-const { matchAudio, standardize, cleanTitle } = require('./audio_match')
+const { matchAudio, standardize, cleanTitle, parseArtists } = require('./audio_match')
 
 /**
  * @typedef { {
@@ -32,17 +33,11 @@ const { matchAudio, standardize, cleanTitle } = require('./audio_match')
  * @param { AudioInfo } targetInfo
  */
 function logMatchingInfo(headline, audioInfo, targetInfo) {
-    const parseArtist = (artists, artist) => {
-        if (artists.length === 0) return artist
-        if (!artists.includes(artist)) return artist + '; ' + artists.join('; ')
-        return artists.join('; ')
-    }
-
     const isWarning = headline.includes('[警告]')
     const prefix = isWarning ? colors.yellow(headline) : colors.bold(headline)
     console.log(prefix)
-    console.log(`\t| 当前音频：${colors.cyan(audioInfo.title)} - ${colors.cyan(parseArtist(audioInfo.artists, audioInfo.artist))} (${colors.gray(audioInfo.duration.toFixed(2) + 'ms')})`)
-    console.log(`\t| 目标音频：${colors.cyan(targetInfo.title)} - ${colors.cyan(parseArtist(targetInfo.artists, targetInfo.artist))} (${colors.gray(targetInfo.duration.toFixed(2) + 'ms')})`)
+    console.log(`\t| 当前音频：${colors.cyan(audioInfo.title)} - ${colors.cyan(parseArtists(audioInfo.artists, audioInfo.artist))} (${colors.gray(audioInfo.duration.toFixed(2) + 'ms')})`)
+    console.log(`\t| 目标音频：${colors.cyan(targetInfo.title)} - ${colors.cyan(parseArtists(targetInfo.artists, targetInfo.artist))} (${colors.gray(targetInfo.duration.toFixed(2) + 'ms')})`)
 }
 
 class CacheMatchFile {
@@ -372,7 +367,7 @@ async function matchSingleAudioInfo(audioInfo, targetInfo, { fileName, clearTitl
         { title: clearTitle, artist: audioInfo.artist, artists: audioInfo.artists },
     ]
 
-    const re = /^([^-]+?)\s*-\s*([^-.]+)\.[^.]{3,4}$/.exec(fileName || '')
+    const re = /^([^-]+?)\s*-\s*([^-]+)\.[^.]{3,4}$/.exec(fileName || '')
     if (re) {
         const str1 = re[1].trim()
         const str2 = re[2].trim()
@@ -382,6 +377,19 @@ async function matchSingleAudioInfo(audioInfo, targetInfo, { fileName, clearTitl
         if (clearTitleTarget === clearStr2 && targetInfo.artist === str1) return true
         miniInfo.push({ title: clearStr1, artist: str2, artists: [] })
         miniInfo.push({ title: clearStr2, artist: str1, artists: [] })
+    }
+
+    if (!re) {
+        const artistsStr = parseArtists(targetInfo.artists, targetInfo.artist)
+        const currentFileName = await standardize(fileName.replace(/\.[^.]{3,4}$/, ''))
+        const targetFileName1 = await standardize(`${ targetInfo.title } - ${ artistsStr }`)
+        const targetFileName2 = await standardize(`${ artistsStr } - ${ targetInfo.title }`)
+        
+        const score = Math.max(
+            stringSimilarity(currentFileName, targetFileName1),
+            stringSimilarity(currentFileName, targetFileName2),
+        )
+        if (score >= 0.9) return true
     }
 
     const deltaDuration = Math.abs(audioInfo.duration - targetInfo.duration)
@@ -466,6 +474,8 @@ async function matchAudioInfo(_audioFileInfo, _targetInfo) {
     }
 
     while (indexCur < audioFileInfo.length) {
+        console.log(colors.cyan(`[开始匹配] `) + colors.gray(audioFileInfo[indexCur].fileName))
+        
         time[0] = durationCur() - timeOffset
         time[1] = durationCur()
         time[2] = durationCur() + timeOffset
@@ -473,7 +483,7 @@ async function matchAudioInfo(_audioFileInfo, _targetInfo) {
         while (rangeTar[1] < rangeTar[2] && durationTar(1) < time[1]) rangeTar[1]++
         while (rangeTar[0] < rangeTar[1] && durationTar(0) < time[0]) rangeTar[0]++
 
-        if (rangeTar[0] === rangeTar[2]) {
+        if (rangeTar[0] === rangeTar[2] && config.warnAll) {
             console.log(colors.yellow(`[警告] `) + `无时间近似音频：${colors.gray(audioFileInfo[indexCur].fileName)}`)
         }
 
@@ -485,7 +495,7 @@ async function matchAudioInfo(_audioFileInfo, _targetInfo) {
                 break
             } else if (l <= rangeTar[0]) i = r++
             else if (rangeTar[2] <= r) i = --l
-            else if (targetInfo[r].audioInfo.duration - time[1] < time[1] - targetInfo[l].audioInfo.duration) i = r++
+            else if (targetInfo[r].audioInfo.duration - time[1] < time[1] - targetInfo[l-1].audioInfo.duration) i = r++
             else i = --l
 
             const audio = audioFileInfo[indexCur]
@@ -497,7 +507,7 @@ async function matchAudioInfo(_audioFileInfo, _targetInfo) {
             })) {
                 audio.match(target.id, target.audioInfo)
                 break
-            } else {
+            } else if (config.warnAll) {
                 logMatchingInfo(
                     `[警告] 尝试匹配音频失败：${ audio.fileName }`,
                     audio.audioInfo,
@@ -511,6 +521,8 @@ async function matchAudioInfo(_audioFileInfo, _targetInfo) {
 
     const targetByTitle = new Map(targetInfo.map(info => [info.clearTitle, info]))
     for (const audio of unmatched) {
+        console.log(colors.cyan(`[再匹配] `) + colors.gray(audio.fileName))
+        
         const target = targetByTitle.get(audio.clearTitle)
         if (target && await matchSingleAudioInfo(audio.audioInfo, target.audioInfo, {
             fileName: audio.fileName,

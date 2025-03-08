@@ -95,6 +95,12 @@ async function matchTitleSimilarity(title, target, titleCleaned = false) {
     return stringSimilarity(title, target)
 }
 
+function parseArtists(artists = [], artist = '') {
+    if (artists.length === 0) return artist
+    if (artist && !artists.includes(artist)) return artist + '; ' + artists.join('; ')
+    return artists.join('; ')
+}
+
 /**
  * @param { string | string[] } artists 
  * @param { string | string[] } target 
@@ -123,15 +129,10 @@ async function matchArtists(artists, target) {
  * @param { { titleCleaned: boolean } } options
  */
 async function matchAudio(audio, target, options = { titleCleaned: false }) {
-    const reduceArtists = (artists, artist) => {
-        if (artists.includes(artist)) return artists.join(';')
-        return artists.join(';') + ';' + artist
-    }
-
     const titleScore = await matchTitleSimilarity(audio.title, target.title, options.titleCleaned)
     const artists = await matchArtists(
-        reduceArtists(audio.artists, audio.artist),
-        reduceArtists(target.artists, target.artist)
+        parseArtists(audio.artists, audio.artist),
+        parseArtists(target.artists, target.artist)
     )
     return { titleScore, artists }
 }
@@ -139,6 +140,7 @@ async function matchAudio(audio, target, options = { titleCleaned: false }) {
 module.exports = {
     standardize,
     cleanTitle,
+    parseArtists,
     matchTitleSimilarity,
     matchArtists,
     matchAudio,

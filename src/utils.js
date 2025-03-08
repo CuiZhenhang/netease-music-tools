@@ -1,12 +1,35 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const colors = require('colors/safe');
+const readline = require('readline');
+
+const config = require('./config');
 
 function sleep(time = 1000) {
     return new Promise((resolve) => {
         setTimeout(() => {
             resolve()
         }, time)
+    })
+}
+
+async function confirm(msg) {
+    if (config.yesAll) {
+        console.log(colors.gray(`[自动回答] ${msg} (y)`))
+        return true
+    }
+    
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    })
+
+    return await new Promise((resolve) => {
+        rl.question(colors.yellow(`${msg} (y/N) `), (answer) => {
+            rl.close();
+            resolve(answer[0]?.toLowerCase() === 'y');
+        })
     })
 }
 
@@ -84,6 +107,7 @@ class CacheMap {
 
 module.exports = {
     sleep,
+    confirm,
     hashFile,
     CacheMap
 }
