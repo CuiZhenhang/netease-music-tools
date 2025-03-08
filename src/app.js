@@ -16,15 +16,14 @@ const { music_match, CacheMatchFile } = require('./music_match');
 async function main() {
     const beginTime = Date.now()
     try {
-        await cache.initCache()
-
         const argv = yargs(hideBin(process.argv))
             .usage(colors.green('用法: $0 <命令> [选项]'))
             .example([
                 [colors.green('$0 match-playlist ../audio 123456'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456)')],
                 [colors.green('$0 match-like ../audio'), colors.cyan('匹配 ../audio 文件夹到网易云我喜欢的音乐')],
                 [colors.green('$0 match-manual ../audio/song.mp3 233560'), colors.cyan('手动匹配音频 ../audio/song.mp3 到网易云歌曲 (ID: 233560)')],
-                [colors.green('$0 update-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的信息')],
+                [colors.green('$0 update-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的缓存信息')],
+                [colors.green('$0 update-file-meta ../audio'), colors.cyan('更新 ../audio 文件夹中音频文件的元数据')],
             ])
             .command({
                 command: 'match-playlist <path> <id> [login]',
@@ -116,7 +115,7 @@ async function main() {
             .command({
                 command: 'update-info <path>',
                 aliases: ['u-info'],
-                desc: colors.cyan('更新已匹配音频的信息'),
+                desc: colors.cyan('更新已匹配音频的缓存信息'),
                 builder: (yargs) => {
                     return yargs
                         .positional('path', {
@@ -124,11 +123,29 @@ async function main() {
                             type: 'string',
                         })
                         .example([
-                            [colors.green('$0 u-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的信息')],
+                            [colors.green('$0 u-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的缓存信息')],
                         ])
                 },
                 handler: (argv) => {
                     argv.operation = 'update-info'
+                }
+            })
+            .command({
+                command: 'update-file-meta <path>',
+                aliases: ['u-meta'],
+                desc: colors.cyan('更新音频文件元数据'),
+                builder: (yargs) => {
+                    return yargs
+                        .positional('path', {
+                            describe: colors.yellow('音频文件夹路径'),
+                            type: 'string',
+                        })
+                        .example([
+                            [colors.green('$0 u-meta ../audio'), colors.cyan('更新 ../audio 文件夹中音频文件的元数据')],
+                        ])
+                },
+                handler: (argv) => {
+                    argv.operation = 'update-file-meta'
                 }
             })
             .command({
@@ -209,7 +226,9 @@ async function main() {
                 return
             }
         }
-        
+
+        await cache.initCache()
+
         switch (argv.operation) {
             case 'match-playlist':
                 await matchPlaylist(path.resolve(argv.path), argv.id, argv.login, argv.cache)
@@ -231,7 +250,14 @@ async function main() {
             break
             case 'logout':
                 if (await confirm('确认要退出登录吗？')) await logout()
-                else console.log(colors.gray('已取消退出登录'));
+                else console.log(colors.gray('已取消操作'));
+            break
+            case 'update-file-meta':
+                if (await confirm('确认要更新音频文件元数据吗？这将覆盖大部分原有的元数据')) {
+                    await updateFileMeta(path.resolve(argv.path))
+                } else {
+                    console.log(colors.gray('已取消操作'))
+                }
             break
         }
     } catch (error) {
@@ -373,7 +399,7 @@ async function matchManual(path, song, songId, useLogin = false) {
 async function updateAllAudioInfo(path) {
     const cacheMatchFile = new CacheMatchFile(path)
     await cacheMatchFile.load()
-    if (cacheMatchFile.isEmpty()) {
+    if (await cacheMatchFile.isEmpty()) {
         console.error(colors.yellow('[警告] 该目录下没有匹配数据'))
         return
     }
@@ -384,7 +410,7 @@ async function updateAllAudioInfo(path) {
 async function clearCacheMatch(path) {
     const cacheMatchFile = new CacheMatchFile(path)
     await cacheMatchFile.load()
-    if (cacheMatchFile.isEmpty()) {
+    if (await cacheMatchFile.isEmpty()) {
         console.error(colors.yellow('[警告] 该目录下没有匹配数据'))
         return
     }
@@ -395,10 +421,45 @@ async function clearCacheMatch(path) {
 async function clearManualMatch(path) {
     const cacheMatchFile = new CacheMatchFile(path)
     await cacheMatchFile.load()
-    if (cacheMatchFile.isEmpty()) {
+    if (await cacheMatchFile.isEmpty()) {
         console.error(colors.yellow('[警告] 该目录下没有匹配数据'))
         return
     }
     await cacheMatchFile.clearManualMatch()
     await cacheMatchFile.saveFinal()
+}
+
+async function updateFileMeta(path) {
+    const { spawn } = require('child_process');
+    const pythonProcess = spawn('python', [
+        '-X', 'utf8',
+        'src/py/update_meta.py',
+        path
+    ], {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    })
+
+    /** @type { (mutiline: string) => string } */
+    const pyFormat = (mutiline, pyMark) => {
+        return pyMark + mutiline.replaceAll(/\n/g, '\n' + pyMark)
+    }
+
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(pyFormat(data.toString(), colors.gray('python|')))
+    })
+    pythonProcess.stderr.on('data', (data) => {
+        console.log(pyFormat(data.toString(), colors.red('python|')))
+    })
+
+    await new Promise((resolve, reject) => {
+        pythonProcess.on('close', (code) => {
+            if (code === 0) {
+                resolve()
+            } else {
+                reject(new Error(`Python脚本执行失败，退出码: ${code}`))
+            }
+        })
+    })
+
+    console.log(colors.yellow('已修改歌曲元数据，建议执行 update-info 以同步本地匹配信息'))
 }
