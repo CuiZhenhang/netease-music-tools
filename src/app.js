@@ -431,9 +431,9 @@ async function clearManualMatch(path) {
 
 async function updateFileMeta(path) {
     const { spawn } = require('child_process');
-    const pythonProcess = spawn('python', [
+    const pythonProcess = spawn('python/venv/Scripts/python', [
         '-X', 'utf8',
-        'src/py/update_meta.py',
+        'python/scripts/update_meta.py',
         path
     ], {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
