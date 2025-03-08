@@ -431,7 +431,9 @@ async function clearManualMatch(path) {
 
 async function updateFileMeta(path) {
     const { spawn } = require('child_process');
-    const pythonProcess = spawn('python/venv/Scripts/python', [
+    const os = require('os');
+    const pythonPath = os.platform() === 'win32' ? 'python/venv/Scripts/python' : 'python/venv/bin/python'
+    const pythonProcess = spawn(pythonPath, [
         '-X', 'utf8',
         'python/scripts/update_meta.py',
         path

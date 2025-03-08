@@ -26,10 +26,16 @@
    cd node src/app.js
    npm install
    ```
-4. 安装Python依赖（用于音频元数据更新）：
+4. 安装Python依赖（用于音频元数据更新）：\
+   Windows
    ```bash
    python -m venv python/venv
    python/venv/Scripts/pip install -r python/requirements.txt
+   ```
+   Linux
+   ```bash
+   python -m venv python/venv
+   python/venv/bin/pip install -r python/requirements.txt
    ```
 
 ## 使用方法
