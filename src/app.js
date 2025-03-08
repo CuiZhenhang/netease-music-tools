@@ -8,7 +8,7 @@ const path = require('path');
 const NeteaseApi = require('NeteaseCloudMusicApi');
 
 const config = require('./config');
-const { initCache } = require('./cache');
+const cache = require('./cache');
 const { login, logout } = require('./login');
 const { confirm } = require('./utils');
 const { music_match, CacheMatchFile } = require('./music_match');
@@ -16,7 +16,7 @@ const { music_match, CacheMatchFile } = require('./music_match');
 async function main() {
     const beginTime = Date.now()
     try {
-        await initCache()
+        await cache.initCache()
 
         const argv = yargs(hideBin(process.argv))
             .usage(colors.green('用法: $0 <命令> [选项]'))
@@ -46,9 +46,15 @@ async function main() {
                             type: 'boolean',
                             default: false
                         })
+                        .option('cache', {
+                            describe: colors.yellow('允许使用缓存的网络数据'),
+                            type: 'boolean',
+                            default: true
+                        })
                         .example([
                             [colors.green('$0 mp ../audio 123456'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456)')],
                             [colors.green('$0 mp ../audio 123456 -l'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456) 使用登录状态')],
+                            [colors.green('$0 mp ../audio 123456 --no-cache'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456) 不使用缓存的网络数据')],
                         ])
                 },
                 handler: (argv) => {
@@ -65,8 +71,14 @@ async function main() {
                             describe: colors.yellow('音频文件夹路径'),
                             type: 'string',
                         })
+                        .option('cache', {
+                            describe: colors.yellow('允许使用缓存的网络数据'),
+                            type: 'boolean',
+                            default: true
+                        })
                         .example([
                             [colors.green('$0 ml ../audio'), colors.cyan('匹配 ../audio 文件夹到网易云我喜欢的音乐')],
+                            [colors.green('$0 ml ../audio --no-cache'), colors.cyan('匹配 ../audio 文件夹到网易云我喜欢的音乐、不使用缓存的网络数据')],
                         ])
                 },
                 handler: (argv) => {
@@ -120,13 +132,6 @@ async function main() {
                 }
             })
             .command({
-                command: 'logout',
-                desc: colors.gray('清除网易云登录状态'),
-                handler: (argv) => {
-                    argv.operation = 'logout'
-                }
-            })
-            .command({
                 command: 'clear-cache <path>',
                 desc: colors.gray('清除自动匹配缓存'),
                 builder: (yargs) => {
@@ -160,6 +165,13 @@ async function main() {
                     argv.operation = 'clear-manual'
                 }
             })
+            .command({
+                command: 'logout',
+                desc: colors.gray('清除网易云登录状态'),
+                handler: (argv) => {
+                    argv.operation = 'logout'
+                }
+            })
             .option('warn', {
                 alias: 'w',
                 describe: colors.yellow('显示额外警告信息'),
@@ -180,7 +192,7 @@ async function main() {
             .alias('help', 'h')
             .version('version', colors.gray('显示版本信息'), require('../package.json').version)
             .alias('version', 'v')
-            .epilogue(colors.gray('更多信息请参考 README.MD'))
+            .epilogue(colors.gray('更多信息请参考 README.md'))
             .argv;
         
         if (argv.warn) {
@@ -200,10 +212,10 @@ async function main() {
         
         switch (argv.operation) {
             case 'match-playlist':
-                await matchPlaylist(path.resolve(argv.path), argv.id, argv.login)
+                await matchPlaylist(path.resolve(argv.path), argv.id, argv.login, argv.cache)
             break
             case 'match-like':
-                await matchLikeList(path.resolve(argv.path))
+                await matchLikeList(path.resolve(argv.path), argv.cache)
             break
             case 'match-manual':
                 await matchManual(path.dirname(argv.song), path.basename(argv.song), argv.id, argv.login)
@@ -211,19 +223,15 @@ async function main() {
             case 'update-info':
                 await updateAllAudioInfo(path.resolve(argv.path))
             break
-            case 'logout':
-                if (await confirm('确认要退出登录吗？')) {
-                    await logout()
-                    console.log(colors.green('已成功退出登录'));
-                } else {
-                    console.log(colors.gray('已取消退出登录'));
-                }
-            break
             case 'clear-cache':
-                await clearCache(path.resolve(argv.path))
+                await clearCacheMatch(path.resolve(argv.path))
             break
             case 'clear-manual':
                 await clearManualMatch(path.resolve(argv.path))
+            break
+            case 'logout':
+                if (await confirm('确认要退出登录吗？')) await logout()
+                else console.log(colors.gray('已取消退出登录'));
             break
         }
     } catch (error) {
@@ -235,52 +243,110 @@ async function main() {
         process.exit(1)
     } finally {
         const endTime = Date.now()
-        console.log(`\n[程序结束] 耗时 ${ ((endTime - beginTime) / 1000).toFixed(3) }s`)
+        console.log(`\n[程序结束] 耗时 ${ ((endTime - beginTime) / 1000).toFixed(3) }s (含用户交互时间)`)
     }
 }
 
 main();
 
-async function matchPlaylist(path, playlistId, useLogin = false) {
+async function matchPlaylist(path, playlistId, useLogin = false, allowCache = true) {
     if (typeof playlistId !== 'number' || isNaN(playlistId)) {
         console.error(colors.red('[错误] 请提供正确的歌单ID'))
         return
     }
 
-    const playlistRes = await NeteaseApi.playlist_track_all({
-        id: playlistId,
-        cookie: useLogin ? (await login()).cookie : undefined
-    })
-    const playlist = playlistRes?.body?.songs
-    if (!Array.isArray(playlist)) {
-        console.error(colors.red('[错误] 获取歌单失败'))
-        return
+    let useCache = false
+    let playlist = []
+    const cachePlaylist = cache.getCache('playlist') || {}
+    if (allowCache && cachePlaylist[playlistId]) {
+        const { data, time } = cachePlaylist[playlistId]
+        if (!Array.isArray(data) || data.length === 0 || Date.now() - time >= 1000 * 60 * 60 /* 1 hour */) {
+            delete cachePlaylist[playlistId]
+        }
+        console.log(colors.gray('已使用缓存的歌单数据'))
+        playlist = data
+        useCache = true
+    }
+
+    if (!useCache) {
+        const playlistRes = await NeteaseApi.playlist_track_all({
+            id: playlistId,
+            cookie: useLogin ? (await login()).cookie : undefined
+        })
+        playlist = playlistRes?.body?.songs
+        if (!Array.isArray(playlist)) {
+            console.error(colors.red('[错误] 获取歌单失败'))
+            return
+        }
     }
 
     await music_match(path, playlist)
+
+    if (!useCache) {
+        cachePlaylist[playlistId] = {
+            data: playlist,
+            time: Date.now()
+        }
+        for (const id in cachePlaylist) {
+            if (Date.now() - cachePlaylist[id].time >= 1000 * 60 * 60 /* 1 hour */) {
+                delete cachePlaylist[id]
+            }
+        }
+        await cache.setCache('playlist', cachePlaylist)
+    }
 }
 
-async function matchLikeList(path) {
+async function matchLikeList(path, allowCache = true) {
     const { cookie, userId } = await login()
-    const likesRes = (await NeteaseApi.likelist({
-        uid: userId,
-        cookie
-    }))
-    if (!likesRes?.body?.ids) {
-        console.error(colors.red('[错误] 获取喜欢的音乐失败'))
-        return
+
+    let useCache = false
+    let likesDetail = []
+    const cacheLikesDetail = cache.getCache('likesDetail') || {}
+    if (allowCache && cacheLikesDetail[userId]) {
+        const { data, time } = cacheLikesDetail[userId]
+        if (!Array.isArray(data) || data.length === 0 || Date.now() - time >= 1000 * 60 * 60 /* 1 hour */) {
+            delete cacheLikesDetail[userId]
+        }
+        console.log(colors.gray('已使用缓存的喜欢的音乐数据'))
+        likesDetail = data
+        useCache = true
     }
 
-    const songDetailRes = await NeteaseApi.song_detail({
-        ids: likesRes.body.ids.join(','),
-        cookie
-    })
-    if (!Array.isArray(songDetailRes?.body?.songs)) {
-        console.error(colors.red('[错误] 获取喜欢的音乐详情失败'))
-        return
+    if (!useCache) {
+        const likesRes = (await NeteaseApi.likelist({
+            uid: userId,
+            cookie
+        }))
+        if (!likesRes?.body?.ids) {
+            console.error(colors.red('[错误] 获取喜欢的音乐失败'))
+            return
+        }
+
+        const songDetailRes = await NeteaseApi.song_detail({
+            ids: likesRes.body.ids.join(','),
+            cookie
+        })
+        if (!Array.isArray(songDetailRes?.body?.songs)) {
+            console.error(colors.red('[错误] 获取喜欢的音乐详情失败'))
+            return
+        }
+        likesDetail = songDetailRes.body.songs
     }
 
-    await music_match(path, songDetailRes.body.songs)
+    await music_match(path, likesDetail)
+
+    if (!useCache) {
+        cacheLikesDetail[userId] = {
+            data: likesDetail,
+            time: Date.now()
+        }
+        for (const id in cacheLikesDetail) {
+            if (Date.now() - cacheLikesDetail[id].time >= 1000 * 60 * 60 /* 1 hour */) {
+                delete cacheLikesDetail[id]
+            }
+        }
+        await cache.setCache('likesDetail', cacheLikesDetail)
+    }
 }
 
 async function matchManual(path, song, songId, useLogin = false) {
@@ -315,7 +381,7 @@ async function updateAllAudioInfo(path) {
     await cacheMatchFile.saveFinal()
 }
 
-async function clearCache(path) {
+async function clearCacheMatch(path) {
     const cacheMatchFile = new CacheMatchFile(path)
     await cacheMatchFile.load()
     if (cacheMatchFile.isEmpty()) {

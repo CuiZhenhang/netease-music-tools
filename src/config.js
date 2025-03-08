@@ -1,10 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 if (!fs.existsSync(path.join(process.cwd(), '.env'))) {
     const defaultEnv = (
         'PORT=23515\n'
         + 'DIR_TEST=tests\n'
+        + 'NETEASE_ACCOUNT=\n'
+        + 'NETEASE_PASSWORD=\n'
         + `CACHE_ENCRYPTION_KEY=${ require('crypto').randomBytes(16).toString('hex') }\n`
         + 'WARN_ALL=false\n'
         + 'YES_ALL=false\n'
@@ -30,6 +33,12 @@ if (missingEnvs.length) {
 const config = {
     port: Number(process.env.PORT),
     dirTest: path.relative(process.cwd(), process.env.DIR_TEST),
+    neteaseAccount: process.env.NETEASE_ACCOUNT,
+    neteasePasswordMD5: ((password) => {
+        password = (password || '').trim()
+        if (!password) return ''
+        return crypto.createHash('md5').update(password).digest('hex')
+    })(process.env.NETEASE_PASSWORD || ''),
     cacheEncryptionKey: process.env.CACHE_ENCRYPTION_KEY,
     warnAll: process.env.WARN_ALL === 'true',
     yesAll: process.env.YES_ALL === 'true',
