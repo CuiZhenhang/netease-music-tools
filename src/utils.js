@@ -105,9 +105,16 @@ class CacheMap {
 
 }
 
+function isMusicFile(fileName) {
+    if (typeof fileName !== 'string') return false
+    return fileName.toLowerCase().endsWith('.mp3')
+        || fileName.toLowerCase().endsWith('.flac')
+}
+
 module.exports = {
     sleep,
     confirm,
     hashFile,
-    CacheMap
+    CacheMap,
+    isMusicFile,
 }

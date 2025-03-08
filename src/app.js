@@ -12,6 +12,7 @@ const cache = require('./cache');
 const { login, logout } = require('./login');
 const { confirm } = require('./utils');
 const { music_match, CacheMatchFile } = require('./music_match');
+const { downloadLyric } = require('./lyric');
 
 async function main() {
     const beginTime = Date.now()
@@ -24,6 +25,7 @@ async function main() {
                 [colors.green('$0 match-manual ../audio/song.mp3 233560'), colors.cyan('手动匹配音频 ../audio/song.mp3 到网易云歌曲 (ID: 233560)')],
                 [colors.green('$0 update-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的缓存信息')],
                 [colors.green('$0 update-file-meta ../audio'), colors.cyan('更新 ../audio 文件夹中音频文件的元数据')],
+                [colors.green('$0 download-lyric ../audio'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词')],
             ])
             .command({
                 command: 'match-playlist <path> <id> [login]',
@@ -149,6 +151,57 @@ async function main() {
                 }
             })
             .command({
+                command: 'download-lyric <path>',
+                aliases: ['d-lyric', 'lyric', 'dl'],
+                desc: colors.cyan('从网易云下载歌词'),
+                builder: (yargs) => {
+                    return yargs
+                        .positional('path', {
+                            describe: colors.yellow('音频文件夹路径'),
+                            type: 'string',
+                        })
+                        .option('login', {
+                            alias: 'l',
+                            describe: colors.yellow('使用登录状态以应对速率检测'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .option('lazy', {
+                            alias: 'z',
+                            describe: colors.yellow('懒加载模式，跳过已有的歌词'),
+                            type: 'boolean',
+                            default: true
+                        })
+                        .option('tran', {
+                            alias: 't',
+                            describe: colors.yellow('是否加载翻译歌词，以 .tran.lrc 为文件后缀'),
+                            type: 'boolean',
+                            default: true
+                        })
+                        .option('roma', {
+                            alias: 'r',
+                            describe: colors.yellow('是否加载罗马音歌词，以 .roma.lrc 为文件后缀'),
+                            type: 'boolean',
+                            default: true
+                        })
+                        .option('wait', {
+                            describe: colors.yellow('匹配时间间隔 (ms)'),
+                            type: 'number',
+                            default: 100
+                        })
+                        .example([
+                            [colors.green('$0 dl ../audio'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词')],
+                            [colors.green('$0 dl ../audio -l'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，使用登录状态')],
+                            [colors.green('$0 dl ../audio -z=0'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，更新所有歌词')],
+                            [colors.green('$0 dl ../audio -t=0 -r=0'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，不加载翻译和罗马音')],
+                            [colors.green('$0 dl ../audio --wait=500'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，调整时间间隔为 500ms 以避免风控')],
+                        ])
+                },
+                handler: (argv) => {
+                    argv.operation = 'download-lyric'
+                }
+            })
+            .command({
                 command: 'clear-cache <path>',
                 desc: colors.gray('清除自动匹配缓存'),
                 builder: (yargs) => {
@@ -187,6 +240,13 @@ async function main() {
                 desc: colors.gray('清除网易云登录状态'),
                 handler: (argv) => {
                     argv.operation = 'logout'
+                }
+            })
+            .command({
+                command: 'test',
+                desc: false,
+                handler: (argv) => {
+                    argv.operation = 'test'
                 }
             })
             .option('warn', {
@@ -258,6 +318,20 @@ async function main() {
                 } else {
                     console.log(colors.gray('已取消操作'))
                 }
+            break
+            case 'download-lyric':
+                await downloadLyric(path.resolve(argv.path), {
+                    lazy: argv.lazy,
+                    noTran: !argv.tran,
+                    noRoma: !argv.roma,
+                    useLogin: argv.login,
+                    wait: argv.wait
+                })
+            break
+            case 'test':
+                console.log(colors.gray('于是什么都没有发生'))
+                // const res = await NeteaseApi.lyric({ id: 22803908 })
+                // console.log(res.body)
             break
         }
     } catch (error) {
@@ -442,15 +516,15 @@ async function updateFileMeta(path) {
     })
 
     /** @type { (mutiline: string) => string } */
-    const pyFormat = (mutiline, pyMark) => {
-        return pyMark + mutiline.replaceAll(/\n/g, '\n' + pyMark)
+    const pyFormat = (mutiline, prefix) => {
+        return prefix + mutiline.replaceAll(/\n/g, '\n' + prefix)
     }
 
     pythonProcess.stdout.on('data', (data) => {
-        console.log(pyFormat(data.toString(), colors.gray('python|')))
+        console.log(pyFormat(data.toString(), colors.gray('python| ')))
     })
     pythonProcess.stderr.on('data', (data) => {
-        console.log(pyFormat(data.toString(), colors.red('python|')))
+        console.log(pyFormat(data.toString(), colors.red('python| ')))
     })
 
     await new Promise((resolve, reject) => {

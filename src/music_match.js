@@ -3,7 +3,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { stringSimilarity } = require('string-similarity-js');
 const colors = require('colors/safe');
-const { hashFile, sleep } = require('./utils');
+const { sleep, hashFile, isMusicFile } = require('./utils');
 const { matchAudio, standardize, cleanTitle, parseArtists } = require('./audio_match')
 
 /**
@@ -216,6 +216,13 @@ class CacheMatchFile {
         )
     }
 
+    /** @returns { Promise<Map<string, MatchInfo>> } */
+    async getMapFileName2MatchInfo() {
+        const mapData1 = this.data.files.map(obj => [obj.fileName, obj])
+        const mapData2 = this.data.manualMatch.map(obj => [obj.fileName, obj])
+        return new Map(mapData1.concat(mapData2))
+    }
+
     async isEmpty() {
         return this.data.files.length === 0
             && this.trashbinData.files.length === 0
@@ -323,12 +330,6 @@ class DB_NeteaseSongDetail {
             unmatched: audioList.filter(obj => !matchedFiles.has(obj.fileName))
         }
     }
-}
-
-
-function isMusicFile(fileName) {
-    return fileName.toLowerCase().endsWith('.mp3')
-        || fileName.toLowerCase().endsWith('.flac')
 }
 
 async function readAudioInfo(filePath) {
@@ -555,6 +556,12 @@ async function music_match(pathDir, songDetailList) {
     })))
 
     console.log(colors.bold('\n[匹配结果]'))
+    console.log(`共计: ${colors.gray(
+        cacheMatch.data.manualMatch.length
+        + cacheMatchCount
+        + matched.length
+        + unmatched.length
+    )} 个`)
     console.log(`手动匹配: ${colors.green(cacheMatch.data.manualMatch.length)} 个`)
     console.log(`缓存自动匹配: ${colors.green(cacheMatchCount)} 个`)
     console.log(`新匹配成功: ${colors.green(matched.length)} 个`)
