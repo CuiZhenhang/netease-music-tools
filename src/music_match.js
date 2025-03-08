@@ -393,8 +393,6 @@ async function matchSingleAudioInfo(audioInfo, targetInfo, { fileName, clearTitl
     }
 
     const deltaDuration = Math.abs(audioInfo.duration - targetInfo.duration)
-    if (isNaN(deltaDuration)) return false
-    if (deltaDuration > 500) return false
 
     for (const info of miniInfo) {
         // if (deltaDuration <= 2) console.log([info, targetInfo, clearTitle, clearTitleTarget])
@@ -410,10 +408,8 @@ async function matchSingleAudioInfo(audioInfo, targetInfo, { fileName, clearTitl
             titleCleaned: true
         })
 
-        if (titleScore < 0.5) continue
-        if (deltaDuration < 2) return true
-        if (titleScore < 0.7) continue
-        if (artists.length > 0) return true
+        if (deltaDuration < 2 && titleScore >= 0.5) return true
+        if (titleScore >= 0.7 && artists.length > 0) return true
     }
 
     return false
