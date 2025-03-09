@@ -503,14 +503,14 @@ async function clearManualMatch(path) {
     await cacheMatchFile.saveFinal()
 }
 
-async function updateFileMeta(path) {
+async function updateFileMeta(pathAudio) {
     const { spawn } = require('child_process');
     const os = require('os');
-    const pythonPath = os.platform() === 'win32' ? 'python/venv/Scripts/python' : 'python/venv/bin/python'
+    const pythonPath = path.join(config.repoDir, os.platform() === 'win32' ? 'python/venv/Scripts/python' : 'python/venv/bin/python')
     const pythonProcess = spawn(pythonPath, [
         '-X', 'utf8',
-        'python/scripts/update_meta.py',
-        path
+        path.join(config.repoDir, 'python/scripts/update_meta.py'),
+        pathAudio
     ], {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     })

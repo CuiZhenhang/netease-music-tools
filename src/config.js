@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-if (!fs.existsSync(path.join(process.cwd(), '.env'))) {
+const repoDir = path.resolve(__dirname, '../')
+
+if (!fs.existsSync(path.join(repoDir, '.env'))) {
     const defaultEnv = (
         'PORT=23515\n'
         + 'DIR_TEST=tests\n'
@@ -13,13 +15,15 @@ if (!fs.existsSync(path.join(process.cwd(), '.env'))) {
         + 'YES_ALL=false\n'
     );
 
-    fs.writeFileSync(path.join(process.cwd(), '.env'), defaultEnv)
+    fs.writeFileSync(path.join(repoDir, '.env'), defaultEnv)
     console.log('未在项目根目录发现 .env 文件，已自动创建')
 }
 
 const dotenv = require('dotenv');
 
-const result = dotenv.config()
+const result = dotenv.config({
+    path: path.join(repoDir, '.env'),
+})
 if (result.error) {
     throw result.error
 }
@@ -31,8 +35,9 @@ if (missingEnvs.length) {
 }
 
 const config = {
+    repoDir,
     port: Number(process.env.PORT),
-    dirTest: path.relative(process.cwd(), process.env.DIR_TEST),
+    dirTest: path.relative(repoDir, process.env.DIR_TEST),
     neteaseAccount: process.env.NETEASE_ACCOUNT,
     neteasePasswordMD5: ((password) => {
         password = (password || '').trim()
