@@ -10,9 +10,10 @@ const NeteaseApi = require('NeteaseCloudMusicApi');
 const config = require('./config');
 const cache = require('./cache');
 const { login, logout } = require('./login');
-const { confirm } = require('./utils');
+const { confirm, ExpireCacheDict } = require('./utils');
 const { music_match, CacheMatchFile } = require('./music_match');
 const { downloadLyric } = require('./lyric');
+const { exportPlaylist } = require('./playlist');
 
 async function main() {
     const beginTime = Date.now()
@@ -26,6 +27,7 @@ async function main() {
                 [colors.green('$0 update-info ../audio'), colors.cyan('更新 ../audio 文件夹中已匹配音频的缓存信息')],
                 [colors.green('$0 update-file-meta ../audio'), colors.cyan('更新 ../audio 文件夹中音频文件的元数据')],
                 [colors.green('$0 download-lyric ../audio'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词')],
+                [colors.green('$0 export-playlist ../audio 123456'), colors.cyan('利用 ../audio 文件夹的匹配信息，导出网易云歌单 (ID: 123456) 的数据为 m3u8 文件')],
             ])
             .command({
                 command: 'match-playlist <path> <id> [login]',
@@ -54,8 +56,8 @@ async function main() {
                         })
                         .example([
                             [colors.green('$0 mp ../audio 123456'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456)')],
-                            [colors.green('$0 mp ../audio 123456 -l'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456) 使用登录状态')],
-                            [colors.green('$0 mp ../audio 123456 --no-cache'), colors.cyan('匹配 ../audio 文件夹到网易云歌单 (ID: 123456) 不使用缓存的网络数据')],
+                            [colors.green('$0 mp ../audio 123456 -l'), colors.cyan('区别：使用登录状态')],
+                            [colors.green('$0 mp ../audio 123456 --no-cache'), colors.cyan('区别：不使用缓存的网络数据')],
                         ])
                 },
                 handler: (argv) => {
@@ -79,7 +81,7 @@ async function main() {
                         })
                         .example([
                             [colors.green('$0 ml ../audio'), colors.cyan('匹配 ../audio 文件夹到网易云我喜欢的音乐')],
-                            [colors.green('$0 ml ../audio --no-cache'), colors.cyan('匹配 ../audio 文件夹到网易云我喜欢的音乐、不使用缓存的网络数据')],
+                            [colors.green('$0 ml ../audio --no-cache'), colors.cyan('区别：不使用缓存的网络数据')],
                         ])
                 },
                 handler: (argv) => {
@@ -151,7 +153,7 @@ async function main() {
                 }
             })
             .command({
-                command: 'download-lyric <path>',
+                command: 'download-lyric <path> [login]',
                 aliases: ['d-lyric', 'dl'],
                 desc: colors.cyan('从网易云下载歌词'),
                 builder: (yargs) => {
@@ -191,14 +193,63 @@ async function main() {
                         })
                         .example([
                             [colors.green('$0 dl ../audio'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词')],
-                            [colors.green('$0 dl ../audio -l'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，使用登录状态')],
-                            [colors.green('$0 dl ../audio -z=0'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，更新所有歌词')],
-                            [colors.green('$0 dl ../audio -t=0 -r=0'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，不加载翻译和罗马音')],
-                            [colors.green('$0 dl ../audio --wait=500'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词，调整时间间隔为 500ms 以避免风控')],
+                            [colors.green('$0 dl ../audio -l'), colors.cyan('区别：使用登录状态')],
+                            [colors.green('$0 dl ../audio -z=0'), colors.cyan('区别：更新所有歌词')],
+                            [colors.green('$0 dl ../audio -t=0 -r=0'), colors.cyan('区别：不加载翻译和罗马音歌词')],
+                            [colors.green('$0 dl ../audio --wait=500'), colors.cyan('区别：调整时间间隔为 500ms 以避免风控')],
                         ])
                 },
                 handler: (argv) => {
                     argv.operation = 'download-lyric'
+                }
+            })
+            .command({
+                command: 'export-playlist <path> <id> [output] [login]',
+                aliases: ['e-playlist', 'ep'],
+                desc: colors.cyan('导出网易云歌单到本地'),
+                builder: (argv) => {
+                    return yargs
+                        .positional('path', {
+                            describe: colors.yellow('音频文件夹路径'),
+                            type: 'string',
+                        })
+                        .positional('id', {
+                            describe: colors.yellow('歌单ID'),
+                            type: 'number'
+                        })
+                        .option('output', {
+                            alias: 'o',
+                            describe: colors.yellow('导出到的目标文件夹，默认为 <path> 文件夹下的 playlist 文件夹'),
+                            type: 'string',
+                        })
+                        .option('login', {
+                            alias: 'l',
+                            describe: colors.yellow('使用登录状态获取完整歌曲信息'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .option('exist', {
+                            alias: 'e',
+                            describe: colors.yellow('不检查本地歌曲文件是否存在'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .option('cache', {
+                            describe: colors.yellow('允许使用缓存的网络数据'),
+                            type: 'boolean',
+                            default: true
+                        })
+                        .example([
+                            [colors.green('$0 ep ../audio 123456'), colors.cyan('利用 ../audio 文件夹的匹配信息，导出网易云歌单 (ID: 123456) 的数据为 m3u8 文件')],
+                            [colors.green('$0 ep ../audio 123456 --output=../my-playlist'), colors.cyan('区别：m3u8 文件导出在 ../my-playlist 文件夹下')],
+                            [colors.green('$0 ep ../audio 123456 -o ../my-playlist'), colors.cyan('区别：m3u8 文件导出在 ../my-playlist 文件夹下')],
+                            [colors.green('$0 ep ../audio 123456 -l'), colors.cyan('区别：使用登录状态')],
+                            [colors.green('$0 ep ../audio 123456 -e'), colors.cyan('区别：不检查本地歌曲文件是否存在')],
+                            [colors.green('$0 ep ../audio 123456 --no-cache'), colors.cyan('区别：不使用缓存的网络数据')],
+                        ])
+                },
+                handler: (argv) => {
+                    argv.operation = 'export-playlist'
                 }
             })
             .command({
@@ -328,10 +379,21 @@ async function main() {
                     wait: argv.wait
                 })
             break
+            case 'export-playlist':
+                await exportPlaylist(path.resolve(argv.path), argv.id, {
+                    outputFileDir: argv.output ? path.resolve(argv.output) : undefined,
+                    useLogin: argv.login,
+                    existAllFile: argv.exist,
+                    allowCache: argv.cache
+                })
+            break
             case 'test':
                 console.log(colors.gray('于是什么都没有发生'))
-                // const res = await NeteaseApi.lyric({ id: 22803908 })
-                // console.log(res.body)
+                // const playlistDetailRes = await NeteaseApi.playlist_detail({
+                //     id: 123456,
+                //     // cookie: useLogin ? (await login()).cookie : undefined
+                // })
+                // await require('fs/promises').writeFile(path.join(config.dirTest, 'playlist_detail.json'), JSON.stringify(playlistDetailRes.body))
             break
         }
     } catch (error) {
@@ -357,14 +419,10 @@ async function matchPlaylist(path, playlistId, useLogin = false, allowCache = tr
 
     let useCache = false
     let playlist = []
-    const cachePlaylist = cache.getCache('playlist') || {}
-    if (allowCache && cachePlaylist[playlistId]) {
-        const { data, time } = cachePlaylist[playlistId]
-        if (!Array.isArray(data) || data.length === 0 || Date.now() - time >= 1000 * 60 * 60 /* 1 hour */) {
-            delete cachePlaylist[playlistId]
-        }
+    const cachePlaylist = new ExpireCacheDict('playlist')
+    if (allowCache && cachePlaylist.getCache(playlistId)) {
         console.log(colors.gray('已使用缓存的歌单数据'))
-        playlist = data
+        playlist = cachePlaylist.getCache(playlistId)
         useCache = true
     }
 
@@ -378,22 +436,10 @@ async function matchPlaylist(path, playlistId, useLogin = false, allowCache = tr
             console.error(colors.red('[错误] 获取歌单失败'))
             return
         }
+        await cachePlaylist.setCache(playlistId, playlist)
     }
 
     await music_match(path, playlist)
-
-    if (!useCache) {
-        cachePlaylist[playlistId] = {
-            data: playlist,
-            time: Date.now()
-        }
-        for (const id in cachePlaylist) {
-            if (Date.now() - cachePlaylist[id].time >= 1000 * 60 * 60 /* 1 hour */) {
-                delete cachePlaylist[id]
-            }
-        }
-        await cache.setCache('playlist', cachePlaylist)
-    }
 }
 
 async function matchLikeList(path, allowCache = true) {
@@ -401,14 +447,10 @@ async function matchLikeList(path, allowCache = true) {
 
     let useCache = false
     let likesDetail = []
-    const cacheLikesDetail = cache.getCache('likesDetail') || {}
-    if (allowCache && cacheLikesDetail[userId]) {
-        const { data, time } = cacheLikesDetail[userId]
-        if (!Array.isArray(data) || data.length === 0 || Date.now() - time >= 1000 * 60 * 60 /* 1 hour */) {
-            delete cacheLikesDetail[userId]
-        }
+    const cacheLikesDetail = new ExpireCacheDict('likesDetail')
+    if (allowCache && cacheLikesDetail.getCache(userId)) {
         console.log(colors.gray('已使用缓存的喜欢的音乐数据'))
-        likesDetail = data
+        likesDetail = cacheLikesDetail.getCache(userId)
         useCache = true
     }
 
@@ -431,22 +473,10 @@ async function matchLikeList(path, allowCache = true) {
             return
         }
         likesDetail = songDetailRes.body.songs
+        await cacheLikesDetail.setCache(userId, likesDetail)
     }
 
     await music_match(path, likesDetail)
-
-    if (!useCache) {
-        cacheLikesDetail[userId] = {
-            data: likesDetail,
-            time: Date.now()
-        }
-        for (const id in cacheLikesDetail) {
-            if (Date.now() - cacheLikesDetail[id].time >= 1000 * 60 * 60 /* 1 hour */) {
-                delete cacheLikesDetail[id]
-            }
-        }
-        await cache.setCache('likesDetail', cacheLikesDetail)
-    }
 }
 
 async function matchManual(path, song, songId, useLogin = false) {
@@ -505,8 +535,7 @@ async function clearManualMatch(path) {
 
 async function updateFileMeta(pathAudio) {
     const { spawn } = require('child_process');
-    const os = require('os');
-    const pythonPath = path.join(config.repoDir, os.platform() === 'win32' ? 'python/venv/Scripts/python' : 'python/venv/bin/python')
+    const pythonPath = path.join(config.repoDir, process.platform === 'win32' ? 'python/venv/Scripts/python' : 'python/venv/bin/python')
     const pythonProcess = spawn(pythonPath, [
         '-X', 'utf8',
         path.join(config.repoDir, 'python/scripts/update_meta.py'),

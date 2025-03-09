@@ -84,9 +84,9 @@ function getCache(key) {
     return cache[key];
 }
 
-function setCache(key, value) {
+async function setCache(key, value) {
     cache[key] = value;
-    return saveCache();
+    await saveCache();
 }
 
 function setCacheNoSave(key, value) {

@@ -37,7 +37,7 @@ if (missingEnvs.length) {
 const config = {
     repoDir,
     port: Number(process.env.PORT),
-    dirTest: path.relative(repoDir, process.env.DIR_TEST),
+    dirTest: path.resolve(repoDir, process.env.DIR_TEST),
     neteaseAccount: process.env.NETEASE_ACCOUNT,
     neteasePasswordMD5: ((password) => {
         password = (password || '').trim()
@@ -47,6 +47,7 @@ const config = {
     cacheEncryptionKey: process.env.CACHE_ENCRYPTION_KEY,
     warnAll: process.env.WARN_ALL === 'true',
     yesAll: process.env.YES_ALL === 'true',
+    expire: 1000 * 60 * 60, // 1 hour
 }
 
 module.exports = config

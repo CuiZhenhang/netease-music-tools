@@ -216,13 +216,6 @@ class CacheMatchFile {
         )
     }
 
-    /** @returns { Promise<Map<string, MatchInfo>> } */
-    async getMapFileName2MatchInfo() {
-        const mapData1 = this.data.files.map(obj => [obj.fileName, obj])
-        const mapData2 = this.data.manualMatch.map(obj => [obj.fileName, obj])
-        return new Map(mapData1.concat(mapData2))
-    }
-
     async isEmpty() {
         return this.data.files.length === 0
             && this.trashbinData.files.length === 0

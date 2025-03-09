@@ -19,7 +19,7 @@ async function downloadLyric(pathDir, { lazy = true, noTran = false, noRoma = fa
         console.error(colors.red('[错误] 无歌曲匹配信息'))
         return
     }
-    const mapFileName2MatchInfo = await cacheMatch.getMapFileName2MatchInfo()
+    const mapFileName2MatchInfo = new Map(cacheMatch.data.files.map(obj => [obj.fileName, obj]))
     
     const fileListAll = await fs.readdir(pathDir)
     const fileNameSet = new Set(fileListAll)
@@ -65,7 +65,7 @@ async function downloadLyric(pathDir, { lazy = true, noTran = false, noRoma = fa
         })
 
         if (lyricRes?.body?.code !== 200) {
-            console.log(colors.yellow('[警告] ') + `${progressStr} 未找到该文件的歌词：${ colors.gray(fileName) } (code=${ lyricRes?.body?.code })`)
+            console.log(colors.yellow('[警告] ') + `${progressStr} 未找到该文件的歌词：${ colors.gray(fileName) } (code: ${ lyricRes?.body?.code })`)
             fail += 1
             continue
         }

@@ -5,6 +5,7 @@ const colors = require('colors/safe');
 const readline = require('readline');
 
 const config = require('./config');
+const cache = require('./cache');
 
 function sleep(time = 1000) {
     return new Promise((resolve) => {
@@ -14,6 +15,10 @@ function sleep(time = 1000) {
     })
 }
 
+/**
+ * @param { string } msg 
+ * @returns { Promise<boolean> }
+ */
 async function confirm(msg) {
     if (config.yesAll) {
         console.log(colors.gray(`[自动回答] ${msg} (y)`))
@@ -105,10 +110,56 @@ class CacheMap {
 
 }
 
+class ExpireCacheDict {
+    key = ''
+    dict = {}
+
+    constructor(key) {
+        if (typeof key !== 'string') throw new TypeError('ExpireCacheDict(key): key must be string')
+        this.key = key
+        this.dict = cache.getCache(key) || {}
+    }
+    
+    getCache(key) {
+        if (Date.now() - this.dict[key]?.time <= config.expire) {
+            return this.dict[key].data
+        }
+    }
+
+    setCacheNoSave(key, value) {
+        this.dict[key] = {
+            data: value,
+            time: Date.now()
+        }
+    }
+
+    async setCache(key, value) {
+        this.setCacheNoSave(key, value)
+        await this.save()
+    }
+
+    async save() {
+        const now = Date.now()
+        for (const key in this.dict) {
+            if (now - this.dict[key]?.time <= config.expire) continue
+            delete this.dict[key]
+        }
+        await cache.setCache(this.key, this.dict)
+    }
+}
+
 function isMusicFile(fileName) {
     if (typeof fileName !== 'string') return false
     return fileName.toLowerCase().endsWith('.mp3')
         || fileName.toLowerCase().endsWith('.flac')
+}
+
+function getTimeString(time = Date.now()) {
+    const date = new Date(time)
+    return {
+        date: `${ date.getFullYear() }-${ date.getMonth() + 1 }-${ date.getDate() }`,
+        time: `${ date.getHours() }:${ date.getMinutes() }:${ date.getSeconds() }`
+    }
 }
 
 module.exports = {
@@ -116,5 +167,7 @@ module.exports = {
     confirm,
     hashFile,
     CacheMap,
+    ExpireCacheDict,
     isMusicFile,
+    getTimeString,
 }
