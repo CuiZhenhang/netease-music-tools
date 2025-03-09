@@ -152,7 +152,7 @@ async function main() {
             })
             .command({
                 command: 'download-lyric <path>',
-                aliases: ['d-lyric', 'lyric', 'dl'],
+                aliases: ['d-lyric', 'dl'],
                 desc: colors.cyan('从网易云下载歌词'),
                 builder: (yargs) => {
                     return yargs
