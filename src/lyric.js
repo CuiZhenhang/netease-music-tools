@@ -19,8 +19,12 @@ async function downloadLyric(pathDir, { lazy = true, noTran = false, noRoma = fa
         console.error(colors.red('[错误] 无歌曲匹配信息'))
         return
     }
-    const mapFileName2MatchInfo = new Map(cacheMatch.data.files.map(obj => [obj.fileName, obj]))
-    
+    const mapFileName2MatchInfo = new Map(
+        cacheMatch.data.files
+            .concat(cacheMatch.data.manualMatch)
+            .map(obj => [obj.fileName, obj])
+    )
+
     const fileListAll = await fs.readdir(pathDir)
     const fileNameSet = new Set(fileListAll)
     let audioList = fileListAll.filter(fileName => isMusicFile(fileName))
