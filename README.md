@@ -47,28 +47,54 @@
 
 对于 Windows 用户，可以选择用 `.\netease-music-tools.cmd` 来替换 `node src/app.js`。
 
+### 操作执行顺序
+
+首先，将本地音乐文件**匹配**到网易云：
+
+- 优先 `match-like` 和 `match-playlist`。
+- 剩余的再 `match-manual`。
+
+然后，可以任意顺序执行以下操作：
+
+- 更新音乐文件的元数据（若不想更新，可跳过本步骤）：依次执行 `update-file-meta` 和 `update-info`。
+
+- 下载歌词：`download-lyric`。
+
+- 导出歌单：`export-playlist`，建议在满足 `文件信息最新` 的条件下使用。
+
+只要按照以上顺序执行操作，且无新增歌曲文件，每次操作完成时“文件信息最新”的条件都是满足的。
+
+未来将新增命令，用于更方便地新增文件，而不重新扫描所有文件。
+
 ### 基本命令
 
 ```bash
 # 匹配整个文件夹到指定歌单
+# 可简写为 m-playlist, mp
 node src/app.js match-playlist <音频文件夹路径> <歌单ID>
 
 # 匹配到"我喜欢的音乐"
+# 可简写为 m-like, ml
 node src/app.js match-like <音频文件夹路径>
 
 # 手动匹配单个音频文件
+# 可简写为 m-manual, mm
 node src/app.js match-manual <音频文件路径> <歌曲ID>
 
 # 更新已匹配音频的缓存信息
+# 可简写为 u-info
 node src/app.js update-info <音频文件夹路径>
 
 # 更新音频文件元数据
+# 可简写为 u-meta
 node src/app.js update-file-meta <音频文件夹路径>
 
 # 从网易云下载歌词，保存到同名 lrc 文件（翻译为 tran.lrc，罗马音为 roma.lrc）
+# 可简写为 d-lyric, dl
 node src/app.js download-lyric <音频文件夹路径>
 
 # 利用音频文件夹的匹配信息，导出网易云歌单的数据为 m3u8 文件
+# 可简写为 e-playlist, ep
 node src/app.js export-playlist <音频文件夹路径> <歌单ID>
 ```
 
@@ -84,7 +110,7 @@ node src/app.js mp . 123456 -l
 # 手动匹配单个音频文件
 node src/app.js mm ./test.mp3 456789
 
-# 更新音频文件元数据
+# 更新音频文件元数据（会修改音乐文件，不影响音质）
 node src/app.js u-meta .
 
 # 为当前目录下已匹配的音频文件下载歌词
@@ -173,17 +199,25 @@ node src/app.js test
 匹配数据会被缓存以提高后续匹配效率。如果自动匹配结果不理想，可以使用手动匹配功能。
 
 - 当音乐文件名满足格式 `{歌名} - {歌手}` 或 `{歌手} - {歌名}` 时，可提升匹配效果（不含文件后缀名、`-` 前后空格数量任意）。
+
 - 对于字符匹配，这些字符集会被标准化：简繁体、平假名与片假名、英文字母大小写、全半角符号（保存时仍为原数据）。
+
 - 一个文件夹中所有的匹配数据被保存在该文件夹中 `.matched.json` 和 `.matched-trashbin.json` 中。其中 `.matched.json` 是当前已匹配的信息；`.matched-trashbin.json` 是曾经匹配成功过，但当前找不到本地的文件，正常情况下删除该文件不会有明显影响。
+
 - 你可以利用 `.matched-trashbin.json` 将两个歌曲文件列表合并，用来源文件夹的 `.matched.json` 替换目标文件夹 `.matched-trashbin.json`，然后执行一次 `ml` 或 `mp`，就可以合并它们的自动匹配歌曲（未来将添加合并功能）。
 
 ## 注意事项
 
 1. 支持的音频格式：MP3、FLAC
+
 2. 元数据更新功能需要 Python 环境支持
+
 3. 部分较大的网络数据会在本地缓存 1 小时
+
 4. 建议在元数据更新后运行 `update-info` 命令同步本地匹配信息
+
 5. 歌曲文件夹内的数据全部未加密，且基于相对路径，意味着你可以随意分享。
+
 6. cookie 等敏感数据均经加密保存，密钥在项目根目录下的 `.env` 文件中，第一次运行时随机生成。以 Windows 为例，数据保存在 `%APPDATA%` 目录下 `NeteaseCloudMusicTools` 文件夹中。
 
 ## 许可证
