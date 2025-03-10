@@ -31,9 +31,11 @@ async function confirm(msg) {
     })
 
     return await new Promise((resolve) => {
-        rl.question(colors.yellow(`${msg} (y/N) `), (answer) => {
-            rl.close();
-            resolve(answer[0]?.toLowerCase() === 'y');
+        rl.question(colors.yellow(`${msg} (y/N) `), async (answer) => {
+            rl.close()
+            const ok = answer[0]?.toLowerCase() === 'y'
+            if (ok) await sleep(300)
+            resolve(ok)
         })
     })
 }

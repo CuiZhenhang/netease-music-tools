@@ -321,6 +321,7 @@ async function main() {
             .version('version', colors.gray('显示版本信息'), require('../package.json').version)
             .alias('version', 'v')
             .epilogue(colors.gray('更多信息请参考 README.md'))
+            .locale('zh_CN')
             .argv;
         
         if (argv.warn) {
@@ -332,7 +333,7 @@ async function main() {
             console.log(colors.gray('已启用自动回答所有问题为是'))
         }
         if (argv.path) {
-            if (!await confirm(`请检查歌曲目录是否正确：${ path.resolve(argv.path) }`)) {
+            if (!await confirm(`请检查歌曲目录是否正确：${ colors.gray(path.resolve(argv.path)) }`)) {
                 console.log(colors.gray('已取消操作'))
                 return
             }
@@ -380,8 +381,13 @@ async function main() {
                 })
             break
             case 'export-playlist':
+                const outputFileDir = argv.output ? path.resolve(argv.output) : undefined
+                if (outputFileDir && !await confirm(`请检查导出目录是否正确：${colors.gray(outputFileDir) }`)) {
+                    console.log(colors.gray('已取消操作'))
+                    return
+                }
                 await exportPlaylist(path.resolve(argv.path), argv.id, {
-                    outputFileDir: argv.output ? path.resolve(argv.output) : undefined,
+                    outputFileDir,
                     useLogin: argv.login,
                     existAllFile: argv.exist,
                     allowCache: argv.cache
