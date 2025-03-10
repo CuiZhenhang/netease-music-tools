@@ -572,5 +572,9 @@ async function updateFileMeta(pathAudio) {
         })
     })
 
-    console.log(colors.yellow('已修改歌曲元数据，建议执行 update-info 以同步本地匹配信息'))
+    // console.log(colors.yellow('已修改歌曲元数据，建议执行 update-info 以同步本地匹配信息'))
+    if (await confirm('已修改歌曲元数据，是否执行 update-info 以同步本地匹配信息？')) {
+        await updateAllAudioInfo(pathAudio)
+    }
+    console.log(colors.gray('已完成操作'))
 }

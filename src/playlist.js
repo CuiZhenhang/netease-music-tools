@@ -4,8 +4,7 @@ const path = require('path');
 const NeteaseApi = require('NeteaseCloudMusicApi');
 
 const config = require('./config');
-const cache = require('./cache');
-const { confirm, isMusicFile, ExpireCacheDict, getTimeString } = require('./utils');
+const { isMusicFile, ExpireCacheDict, getTimeString } = require('./utils');
 const { login } = require('./login');
 const { CacheMatchFile } = require('./music_match');
 
@@ -59,10 +58,7 @@ async function exportPlaylist(pathDir, playlistId, { outputFileDir = '', type = 
     const mapNeteaseId2MatchInfo = new Map(cacheMatch.data.files.map(obj => [obj.neteaseId, obj]))
     const audioSet = new Set(existAllFile ? [] : (await fs.readdir(pathDir)).filter(isMusicFile))
 
-    if (!await confirm(`请确认已执行 update-info 使文件信息最新，否则将现在执行`)) {
-        await cacheMatch.updateAllAudioInfo()
-        await cacheMatch.saveFinal()
-    }
+    console.log(colors.yellow('请确保文件信息最新，否则 m3u8 文件的歌曲描述信息可能不准确'))
 
     let useCache = false
     /** @type { { name: string, description: string, coverImgUrl: string, ids: number[] } } */
