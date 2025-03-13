@@ -7,6 +7,18 @@ const { sleep, isMusicFile } = require('./utils');
 const { login } = require('./login');
 const { CacheMatchFile } = require('./music_match');
 
+function fixLyric(lyric) {
+    if (typeof lyric !== 'string' || !lyric) return lyric
+    const lines = lyric.split('\n')
+    for (let [index, line] of lines.entries()) {
+        if (/^\[\d+:\d+\.\d+\]/.test(line)) continue
+        line = line.replace(/^\[\s*([\d.:]+)\s*\]/, '[$1]')
+        line = line.replace(/^\[(\d+)[:.](\d+)[:.](\d+)\]/, '[$1:$2.$3]')
+        lines[index] = line
+    }
+    return lines.join('\n')
+}
+
 /**
  * @param { string } pathDir 
  */
@@ -75,9 +87,9 @@ async function downloadLyric(pathDir, { lazy = true, noTran = false, noRoma = fa
         }
 
         const data = lyricRes.body || {}
-        const lrc = String(data.lrc?.lyric || '')
-        const lrcTran = noTran ? '' : String(data.tlyric?.lyric || '')
-        const lrcRoma = noRoma ? '' : String(data.romalrc?.lyric || '')
+        const lrc = fixLyric(String(data.lrc?.lyric || ''))
+        const lrcTran = fixLyric(noTran ? '' : String(data.tlyric?.lyric || ''))
+        const lrcRoma = fixLyric(noRoma ? '' : String(data.romalrc?.lyric || ''))
 
         if (lrc.trim().length === 0) {
             console.log(colors.yellow('[警告] ') + `${progressStr} 该文件暂无歌词：${ colors.gray(fileName) }`)
