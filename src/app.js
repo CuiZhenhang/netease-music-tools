@@ -14,6 +14,7 @@ const { confirm, ExpireCacheDict } = require('./utils');
 const { music_match, CacheMatchFile } = require('./music_match');
 const { downloadLyric } = require('./lyric');
 const { exportPlaylist } = require('./playlist');
+const { mergeMatch } = require('./merge');
 
 async function main() {
     const beginTime = Date.now()
@@ -28,6 +29,7 @@ async function main() {
                 [colors.green('$0 update-file-meta ../audio'), colors.cyan('更新 ../audio 文件夹中音频文件的元数据')],
                 [colors.green('$0 download-lyric ../audio'), colors.cyan('对 ../audio 文件夹中已匹配的音频下载歌词')],
                 [colors.green('$0 export-playlist ../audio 123456'), colors.cyan('利用 ../audio 文件夹的匹配信息，导出网易云歌单 (ID: 123456) 的数据为 m3u8 文件')],
+                [colors.green('$0 merge ../audio ../audio2'), colors.cyan('合并 ../audio2 文件夹到 ../audio 文件夹')],
             ])
             .command({
                 command: 'match-playlist <path> <id> [login]',
@@ -253,6 +255,48 @@ async function main() {
                 }
             })
             .command({
+                command: 'merge <path> <source>',
+                desc: colors.gray('合并匹配数据'),
+                builder: (yargs) => {
+                    return yargs
+                        .positional('path', {
+                            describe: colors.yellow('目标文件夹'),
+                            type: 'string'
+                        })
+                        .positional('source', {
+                            describe: colors.yellow('来源文件夹'),
+                            type: 'string'
+                        })
+                        .option('copy', {
+                            alias: 'c',
+                            describe: colors.yellow('复制文件而不是移动'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .option('overwrite', {
+                            alias: 'o',
+                            describe: colors.yellow('覆盖已存在的文件'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .option('musicFileOnly', {
+                            alias: 'm',
+                            describe: colors.yellow('仅处理音乐文件'),
+                            type: 'boolean',
+                            default: false
+                        })
+                        .example([
+                            [colors.green('$0 merge ../audio ../audio2'), colors.cyan('合并 ../audio2 文件夹到 ../audio 文件夹')],
+                            [colors.green('$0 merge ../audio ../audio2 -c'), colors.cyan('区别：复制文件而不是移动')],
+                            [colors.green('$0 merge ../audio ../audio2 -o'), colors.cyan('区别：覆盖已存在的文件')],
+                            [colors.green('$0 merge ../audio ../audio2 -m'), colors.cyan('区别：仅处理音乐文件')],
+                        ])
+                },
+                handler: (argv) => {
+                    argv.operation = 'merge'
+                }
+            })
+            .command({
                 command: 'clear-cache <path>',
                 desc: colors.gray('清除自动匹配缓存'),
                 builder: (yargs) => {
@@ -393,13 +437,21 @@ async function main() {
                     allowCache: argv.cache
                 })
             break
+            case 'merge':
+                if (!await confirm(`请检查来源目录是否正确：${ colors.gray(path.resolve(argv.source)) }`)) {
+                    console.log(colors.gray('已取消操作'))
+                    return
+                }
+                await mergeMatch(path.resolve(argv.path), path.resolve(argv.source), {
+                    copy: argv.copy,
+                    overwrite: argv.overwrite,
+                    musicFileOnly: argv.musicFileOnly
+                })
+            break
             case 'test':
                 console.log(colors.gray('于是什么都没有发生'))
-                // const playlistDetailRes = await NeteaseApi.playlist_detail({
-                //     id: 123456,
-                //     // cookie: useLogin ? (await login()).cookie : undefined
-                // })
-                // await require('fs/promises').writeFile(path.join(config.dirTest, 'playlist_detail.json'), JSON.stringify(playlistDetailRes.body))
+                // console.log(cache.getCache('cookie'))
+                // await cache.saveCache()
             break
         }
     } catch (error) {

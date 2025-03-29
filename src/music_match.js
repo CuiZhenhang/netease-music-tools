@@ -66,6 +66,8 @@ class CacheMatchFile {
             this.data = JSON.parse(await fs.readFile(this.filePath))
             if (!Array.isArray(this.data.files)) this.data.files = []
             if (!Array.isArray(this.data.manualMatch)) this.data.manualMatch = []
+            this.data.files = this.data.files.filter(file => file?.fileName)
+            this.data.manualMatch = this.data.manualMatch.filter(file => file?.fileName)
         } catch (error) {
             this.data = {
                 files: [],
@@ -75,6 +77,7 @@ class CacheMatchFile {
         try {
             this.trashbinData = JSON.parse(await fs.readFile(this.trashbinFilePath))
             if (!Array.isArray(this.trashbinData.files)) this.trashbinData.files = []
+            this.trashbinData.files = this.trashbinData.files.filter(file => file?.fileName)
         } catch (error) {
             this.trashbinData = {
                 files: []

@@ -26,6 +26,7 @@ function getStoragePath(appName = 'NeteaseCloudMusicTools') {
 const storagePath = getStoragePath()
 const cahceFile = path.join(storagePath, 'cache');
 const ALGORITHM = 'aes-256-cbc';
+const SensitiveKeyList = ['cookie'];
 
 let cache = {
     cookie: '',
@@ -59,12 +60,25 @@ async function initCache() {
         try {
             await fs.access(cahceFile);
         } catch (err) {
-            await fs.writeFile(cahceFile, encrypt('{}'));
+            await fs.writeFile(cahceFile, '{}');
         }
         
-        const encryptedData = await fs.readFile(cahceFile, 'utf-8');
-        const decryptedData = decrypt(encryptedData);
-        cache = JSON.parse(decryptedData);
+        const data = await fs.readFile(cahceFile, 'utf-8');
+        try {
+            cache = JSON.parse(data);
+        } catch (error) {
+            const decryptedData = decrypt(data);
+            cache = JSON.parse(decryptedData);
+        }
+        for (const key of SensitiveKeyList) {
+            if (typeof cache[key] === 'string') {
+                try {
+                    cache[key] = JSON.parse(decrypt(cache[key]));
+                } catch (error) {
+                    // do nothing
+                }
+            }
+        }
     } catch (error) {
         console.error('初始化缓存出错:', error);
         cache = {};
@@ -73,8 +87,13 @@ async function initCache() {
 
 async function saveCache() {
     try {
-        const encryptedData = encrypt(JSON.stringify(cache));
-        await fs.writeFile(cahceFile, encryptedData);
+        const cacheCopy = JSON.parse(JSON.stringify(cache));
+        for (const key of SensitiveKeyList) {
+            if (typeof cacheCopy[key] !== 'undefined') {
+                cacheCopy[key] = encrypt(JSON.stringify(cacheCopy[key]));
+            }
+        }
+        await fs.writeFile(cahceFile, JSON.stringify(cacheCopy), 'utf-8');
     } catch (error) {
         console.error('保存缓存出错:', error);
     }
