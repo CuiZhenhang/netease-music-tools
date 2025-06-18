@@ -156,13 +156,16 @@ class CacheMatchFile {
             }
         }
         cachedMap.clear() // release memory
+        cachedMapOld.clear() // release memory
 
         this.data.files = this.data.files.filter(file => file !== null)
         this.trashbinData.files = this.trashbinData.files.filter(file => file !== null)
-        
-        this.trashbinData.files.push(...this.data.files.filter(file => !cachedMapOld.has(file.hashCode)))
+
+        const trashbinNewHashCodeSet = new Set(this.data.files.map(file => file.hashCode))
+        this.trashbinData.files = this.trashbinData.files.filter(file => !trashbinNewHashCodeSet.has(file.hashCode))
+        this.trashbinData.files.push(...this.data.files)
         this.data.files = matchedFiles
-        
+
         const result = fileList
             .filter(obj => obj.matched === false && obj.muti === false)
             .map(obj => ({ fileName: obj.fileName, hashCode: obj.hashCode }))
@@ -173,9 +176,11 @@ class CacheMatchFile {
      * @param { MatchInfo[] } matchInfoList
      */
     async addMatchedFile(matchInfoList) {
-        const hashCodeSet = new Set(this.data.files.map(file => file.hashCode))
+        const fileNameSet = new Set(matchInfoList.map(file => file.fileName))
+        this.data.files = this.data.files.filter(file => !fileNameSet.has(file.fileName))
+        // const hashCodeSet = new Set(this.data.files.map(file => file.hashCode))
         for (const file of matchInfoList) {
-            if (hashCodeSet.has(file.hashCode)) continue
+            // if (hashCodeSet.has(file.hashCode)) continue
             this.data.files.push(file)
         }
     }

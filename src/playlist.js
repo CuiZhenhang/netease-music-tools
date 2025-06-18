@@ -55,12 +55,13 @@ async function exportPlaylist(pathDir, playlistId, { outputFileDir = '', type = 
         console.error(colors.red('[错误] 无歌曲匹配信息'))
         return
     }
+    const audioSet = new Set(existAllFile ? [] : (await fs.readdir(pathDir)).filter(isMusicFile))
     const mapNeteaseId2MatchInfo = new Map(
         cacheMatch.data.files
             .concat(cacheMatch.data.manualMatch)
+            .filter(obj => existAllFile || audioSet.has(obj.fileName))
             .map(obj => [obj.neteaseId, obj])
     )
-    const audioSet = new Set(existAllFile ? [] : (await fs.readdir(pathDir)).filter(isMusicFile))
 
     console.log(colors.yellow('请确保文件信息最新，否则 m3u8 文件的歌曲描述信息可能不准确'))
 
@@ -113,11 +114,11 @@ async function exportPlaylist(pathDir, playlistId, { outputFileDir = '', type = 
                 continue
             }
             const fileName = info.fileName
-            if (!existAllFile && !audioSet.has(fileName)) {
-                lines.push(...headerLines, `# [错误]：找不到文件 ${ fileName }`)
-                console.log(colors.yellow(`[警告] `) + `找不到文件 ${ colors.gray(fileName) }`)
-                continue
-            }
+            // if (!existAllFile && !audioSet.has(fileName)) {
+            //     lines.push(...headerLines, `# [错误]：找不到文件 ${ fileName }`)
+            //     console.log(colors.yellow(`[警告] `) + `找不到文件 ${ colors.gray(fileName) }`)
+            //     continue
+            // }
             const { duration, title, artist, artists /* not to use */ } = info.audioInfo || {}
             const clean = (str) => String(str || '').replaceAll(/,/g, ';').replaceAll(/\n/g, '___').trim()
             lines.push(

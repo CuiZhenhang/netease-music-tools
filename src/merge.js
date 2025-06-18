@@ -74,12 +74,23 @@ async function mergeMatch(targetDir, sourceDir, { copy = false, overwrite = fals
             const fileList = getFileListByBaseName(baseName)
             try {
                 for (const file of fileList) {
-                    if (musicFileOnly && !isMusicFile(file)) continue
+                    const musicFileCheck = isMusicFile(file)
+                    if (musicFileOnly && !musicFileCheck) continue
                     const sourcePath = path.join(sourceDir, file)
                     const targetPath = path.join(targetDir, file)
                     if (!overwrite && targetFileNameSet.has(file)) {
                         console.log(colors.yellow(`\t| [跳过] ${file} 已存在`))
                         continue
+                    }
+                    
+                    targetFileNameSet.add(file)
+                    if (musicFileCheck) {
+                        const index = mapTargetFileName2Index.get(fileName)
+                        if (typeof index === 'number') {
+                            targetData[index] = JSON.parse(JSON.stringify(info))
+                        } else {
+                            targetData.push(JSON.parse(JSON.stringify(info)))
+                        }
                     }
                     if (copy) {
                         await fs.copyFile(sourcePath, targetPath)
@@ -87,20 +98,13 @@ async function mergeMatch(targetDir, sourceDir, { copy = false, overwrite = fals
                     } else {
                         await fs.rename(sourcePath, targetPath)
                         fileNameSet.delete(file)
+                        if (musicFileCheck) {
+                            const index = mapSourceFileName2Index.get(fileName)
+                            if (typeof index === 'number') {
+                                sourceData[index] = null
+                            }
+                        }
                         console.log(colors.cyan(`\t| [移动] ${file}`))
-                    }
-                    targetFileNameSet.add(file)
-                }
-                const index = mapTargetFileName2Index.get(fileName)
-                if (typeof index === 'number') {
-                    targetData[index] = JSON.parse(JSON.stringify(info))
-                } else {
-                    targetData.push(JSON.parse(JSON.stringify(info)))
-                }
-                if (!fileNameSet.has(fileName)) {
-                    const index = mapSourceFileName2Index.get(fileName)
-                    if (typeof index === 'number') {
-                        sourceData[index] = null
                     }
                 }
             } catch (error) {
